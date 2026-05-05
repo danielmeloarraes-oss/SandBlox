@@ -100,6 +100,19 @@
     </style>
 </head>
 <body>
+    <div id="publish-modal" class="screen" style="background: rgba(0,0,0,0.8); z-index: 1000;">
+        <div class="auth-box" style="width: 400px;">
+            <h2 style="color: var(--primary);">Publicar Novo Jogo</h2>
+            <input type="text" id="pub-game-name" placeholder="Nome do Jogo">
+            <p style="font-size: 12px; color: #aaa;">Selecione o arquivo .sandy</p>
+            <input type="file" id="pub-game-file" accept=".sandy" style="background: none; border: 1px solid #444; width: 100%; box-sizing: border-box; padding: 10px; color: white;">
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button onclick="closePublishModal()" style="background: #555; flex: 1;">Cancelar</button>
+                <button onclick="publishGame()" style="flex: 1;">Finalizar</button>
+            </div>
+        </div>
+    </div>
+    
 
     <div id="auth-screen" class="screen">
         <div class="auth-box">
@@ -118,7 +131,7 @@
                 <button onclick="sendFriendRequest()">Conectar</button>
             </div>
             <div class="right-nav-controls">
-                <button onclick="openAvatarEditor()" style="background:#444; padding: 5px 15px; font-size: 12px;">Editar Avatar</button>
+                <button onclick="openPublishModal()" style="background:var(--accent); padding: 5px 15px; font-size: 12px; margin-right: 5px;">Publicar Jogo</button><button onclick="openAvatarEditor()" style="background:#444; padding: 5px 15px; font-size: 12px;">Editar Avatar</button>
             </div>
         </div>
         <div class="friends-sidebar">
@@ -136,7 +149,7 @@
             </div>
             <div class="game-card" onclick="startGame('battlegrounds')">
                 <div class="game-thumb" style="background:#c0392b">Campos de Batalha</div>
-                <div style="padding:15px"><b>Combate Multiplayer</b></div>
+                <div style="padding:15px"><b>Multiplayer</b></div>
             </div>
             <div class="game-card" onclick="startGame('killer')">
                 <div class="game-thumb" style="background:#000; color:red; border: 2px solid red;">Killer vs Sobreviventes</div>
@@ -151,7 +164,6 @@
             <div id="avatar-canvas-container"></div>
             <div class="catalog">
                 <div id="currency-display-avatar">
-                    <div class="bux-icon"></div>
                     <span id="bux-amount">0</span>
                     <span style="font-size: 12px; margin-left: 5px; color: var(--primary);">SANDBUX</span>
                 </div>
@@ -163,17 +175,14 @@
                             <div class="color-circle" style="background:#f1c27d" onclick="changePartColor('skin','#f1c27d')"></div>
                             <div class="color-circle" style="background:#ffd700" onclick="changePartColor('skin','#ffd700')"></div>
                             <div class="color-circle" style="background:#8d5524" onclick="changePartColor('skin','#8d5524')"></div>
-                            <div class="color-circle" style="background:#222" onclick="changePartColor('skin','#222')"></div>
                         </div>
                     </div>
                     <div class="catalog-item">
                         <p>Cor da Camisa</p>
                         <div class="color-grid">
-                            <div class="color-circle" style="background:#ff4d4d" onclick="changePartColor('torso','#ff4d4d')"></div>
                             <div class="color-circle" style="background:#3366ff" onclick="changePartColor('torso','#3366ff')"></div>
+                            <div class="color-circle" style="background:#ff4d4d" onclick="changePartColor('torso','#ff4d4d')"></div>
                             <div class="color-circle" style="background:#2ecc71" onclick="changePartColor('torso','#2ecc71')"></div>
-                            <div class="color-circle" style="background:#f1c40f" onclick="changePartColor('torso','#f1c40f')"></div>
-                            <div class="color-circle" style="background:#8e44ad" onclick="changePartColor('torso','#8e44ad')"></div>
                             <div class="color-circle" style="background:#ecf0f1" onclick="changePartColor('torso','#ecf0f1')"></div>
                         </div>
                     </div>
@@ -287,14 +296,46 @@
 
     function initMultiplayer() {
         peer = new Peer('sandblox-' + userData.name, { config: { 'iceServers': [{ url: 'stun:stun.l.google.com:19302' }] } });
-        peer.on('connection', (conn) => setupConnection(conn));
+        peer.on('connection', (conn) => {
+            setupConnection(conn);
+            conn.on('open', () => {
+                customGames.forEach(game => {
+                    conn.send({ type: 'NEW_CUSTOM_GAME', game: game });
+                });
+            });
+            // [FIX: MULTIVERSO] Host envia SYNC_MAP ao abrir conexão
+            setTimeout(() => {
+                if (conn.open) {
+                    conn.send({ type: 'SYNC_MAP', map: currentMode });
+                }
+            }, 500);
+        });
     }
 
     function setupConnection(conn) {
         connections[conn.peer] = conn;
         conn.on('data', (data) => {
-            if(data.type === 'move') updateRemotePlayer(conn.peer, data);
+            // [FIX: MULTIVERSO] Filtro de Coordenadas
+            if (data.type === 'move') {
+                if (data.map && data.map !== currentMode) return;
+                updateRemotePlayer(conn.peer, data);
+            }
+            
+            // [FIX: MULTIVERSO] Handshake SYNC_MAP
+            if (data.type === 'SYNC_MAP') {
+                if (data.map !== currentMode) {
+                    console.log("Mapa diferente detectado! Sincronizando com o Host...");
+                    startGame(data.map);
+                }
+            }
+
             if(data.type === 'chat') showBubble(conn.peer, data.text);
+            if(data.type === 'NEW_CUSTOM_GAME') { 
+                if(!customGames.find(g => g.id === data.game.id)) { 
+                    customGames.push(data.game); 
+                    addGameToGrid(data.game); 
+                } 
+            }
             if(data.type === 'attack') handleRemoteAttack(conn.peer, data);
             if(data.type === 'damage') handleDamage(data.amount);
             if(data.type === 'mine') createRemoteMine(data.pos);
@@ -316,6 +357,11 @@
         if(targetName && targetName !== userData.name) {
             const conn = peer.connect('sandblox-' + targetName);
             setupConnection(conn);
+            conn.on('open', () => {
+                customGames.forEach(game => {
+                    conn.send({ type: 'NEW_CUSTOM_GAME', game: game });
+                });
+            });
             alert("Tentando conectar com " + targetName + "...");
         }
     }
@@ -390,12 +436,42 @@
     }
 
     function initGame() {
+        // Limpar renderer anterior se existir
+        const container = document.getElementById('game-container');
+        while (container.firstChild) container.removeChild(container.firstChild);
+        
+        // Recriar elementos de UI que foram removidos
+        container.innerHTML = `
+            <div id="chat-history"></div>
+            <div id="chat-input-container"><input type="text" id="chat-input" placeholder="Pressione '/' para falar..." maxlength="50"></div>
+            <div style="position:absolute; top:20px; left:20px; z-index:50; color:white; background:rgba(0,0,0,0.5); padding:10px; border-radius:5px; cursor:pointer;" onclick="toggleRobloxMenu()">☰ Menu</div>
+            <div id="battle-ui" style="display:${currentMode === 'battlegrounds' ? 'flex' : 'none'}">
+                <div class="health-info"><span class="health-text" id="health-text">100/100</span><div class="health-bar-container"><div id="health-fill"></div></div></div>
+                <div class="attacks-container">
+                    <div class="attack-slot" id="slot-1" onclick="useAttack(1)"><span class="attack-icon">👊</span><div class="cooldown-overlay" id="cd-1"></div></div>
+                    <div class="attack-slot" id="slot-2" onclick="useAttack(2)"><span class="attack-icon">⚡</span><div class="cooldown-overlay" id="cd-2"></div></div>
+                    <div class="attack-slot" id="slot-3" onclick="useAttack(3)"><span class="attack-icon">💨</span><div class="cooldown-overlay" id="cd-3"></div></div>
+                    <div class="attack-slot" id="slot-4" onclick="useAttack(4)"><span class="attack-icon">🔥</span><div class="cooldown-overlay" id="cd-4"></div></div>
+                </div>
+            </div>
+            <div id="killer-lobby-ui" style="display:${currentMode === 'killer' ? 'block' : 'none'}"><h3 style="color:red; margin:0 0 10px 0;">Lobby: Killer vs Sobreviventes</h3><p id="lobby-status">Aguardando jogadores...</p><div id="lobby-players"></div></div>
+            <div id="killer-timer">02:00</div>
+            <div id="roblox-menu"><div class="menu-content"><h3>SandBlox</h3><button class="menu-btn" style="background:#444; color:white" onclick="toggleRobloxMenu()">Retomar</button><button class="menu-btn" style="background:#ff4d4d; color:white" onclick="finishGame()">Sair</button></div></div>
+        `;
+
         scene = new THREE.Scene(); scene.background = new THREE.Color(0x87CEEB);
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById('game-container').appendChild(renderer.domElement);
+        container.appendChild(renderer.domElement);
         playerGroup = createCharacterMesh(userData.avatar); playerGroup.position.set(0, 5, 0); scene.add(playerGroup);
         
+        if (currentMode.startsWith('custom-')) {
+            const game = customGames.find(g => g.id === currentMode);
+            if (game) {
+                loadSandyMap(game.content);
+                playerGroup.position.set(0, 50, 0);
+            }
+        }
         if(currentMode === 'killer') {
             createCabinLobby();
         } else if(currentMode === 'baseplate') {
@@ -408,6 +484,10 @@
         
         scene.add(new THREE.AmbientLight(0xffffff, 0.8)); const sun = new THREE.DirectionalLight(0xffffff, 1); sun.position.set(10, 20, 10); scene.add(sun);
         renderer.domElement.onclick = () => { if(!menuOpen && !chatOpen) renderer.domElement.requestPointerLock(); };
+        
+        // Limpar jogadores antigos da cena ao trocar de mapa
+        otherPlayers = {};
+        
         loop();
     }
 
@@ -438,86 +518,90 @@
     }
 
     function createObby() {
-        const startPlatform = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 10), new THREE.MeshStandardMaterial({color: 0x7f8c8d})); startPlatform.position.set(0, -0.5, 0); scene.add(startPlatform); obbyPlatforms.push(startPlatform);
-        for(let i = 1; i <= 20; i++) { const step = new THREE.Mesh(new THREE.BoxGeometry(4, 0.5, 4), new THREE.MeshStandardMaterial({color: Math.random() * 0xffffff})); step.position.set(Math.sin(i)*6, i * 2, i * -10); scene.add(step); obbyPlatforms.push(step); }
-    }
-
-    // Killer vs Survivors Logic
-    function initKillerLobby() {
-        Object.values(connections).forEach(c => c.send({ type: 'killer_lobby', name: userData.name }));
-        updateLobbyUI();
-    }
-
-    function handleKillerLobby(id, data) {
-        if(!lobbyPlayers.includes(id)) lobbyPlayers.push(id);
-        updateLobbyUI();
-        if(lobbyPlayers.length >= 1 && !killerGameActive) {
-            document.getElementById('lobby-status').innerText = "Jogadores suficientes! Começando em 3s...";
-            setTimeout(() => { if(lobbyPlayers.length >= 1) startKillerSequence(); }, 3000);
+        const ground = new THREE.Mesh(new THREE.BoxGeometry(50, 1, 50), new THREE.MeshStandardMaterial({color: 0x228B22})); ground.position.y = -0.5; scene.add(ground); obbyPlatforms.push(ground);
+        for(let i = 0; i < 15; i++) {
+            const plat = new THREE.Mesh(new THREE.BoxGeometry(5, 0.5, 5), new THREE.MeshStandardMaterial({color: Math.random() * 0xffffff}));
+            plat.position.set(Math.sin(i)*10, i * 3, i * 10); scene.add(plat); obbyPlatforms.push(plat);
         }
     }
 
-    function updateLobbyUI() {
-        const list = document.getElementById('lobby-players');
-        list.innerHTML = `<p>• ${userData.name} (Você)</p>`;
-        Object.keys(connections).forEach(id => { list.innerHTML += `<p>• ${id.replace('sandblox-', '')}</p>`; });
-    }
-
-    function startKillerSequence() {
-        if(killerGameActive) return;
-        const allIds = [peer.id, ...Object.keys(connections)];
-        const chosenKiller = allIds[Math.floor(Math.random() * allIds.length)];
-        const startData = { type: 'killer_start', killer: chosenKiller };
-        Object.values(connections).forEach(c => c.send(startData));
-        startKillerGame(startData);
-    }
-
-    function applyKillerVisual(group) {
-        group.traverse(child => { if(child.isMesh) { child.material = new THREE.MeshStandardMaterial({color: 0xff0000, emissive: 0x330000}); } });
-    }
-
-    function startKillerGame(data) {
-        killerGameActive = true; killerId = data.killer; isKiller = (peer.id === killerId);
-        document.getElementById('killer-lobby-ui').style.display = 'none';
-        
-        // Teleport to game map
-        inCabinLobby = false;
-        cabinObjects.forEach(obj => scene.remove(obj));
-        obbyPlatforms = [];
-        scene.background = new THREE.Color(0x87CEEB);
-        const ground = new THREE.Mesh(new THREE.BoxGeometry(1000, 2, 1000), new THREE.MeshStandardMaterial({color: 0x228B22})); ground.position.y = -2.5; scene.add(ground); obbyPlatforms.push(ground);
-        playerGroup.position.set(0, 5, 0);
-
-        if(isKiller) { alert("VOCÊ É O KILLER (c00lkidd Forsaken)!"); applyKillerVisual(playerGroup); } 
-        else { alert("VOCÊ É UM SOBREVIENTE! Fuja do c00lkidd!"); if(otherPlayers[killerId]) applyKillerVisual(otherPlayers[killerId]); }
-        document.getElementById('killer-timer').style.display = 'block';
-        gameTimer = 120; if(killerInterval) clearInterval(killerInterval);
-        killerInterval = setInterval(() => {
-            gameTimer--; let mins = Math.floor(gameTimer / 60); let secs = gameTimer % 60;
-            document.getElementById('killer-timer').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
-            if(gameTimer <= 0) { endKillerGame('survivors'); }
-        }, 1000);
-    }
-
-    function endKillerGame(winner) {
-        clearInterval(killerInterval); killerGameActive = false; document.getElementById('killer-timer').style.display = 'none';
-        alert(winner === 'killer' ? "O Killer venceu!" : "Os Sobreviventes venceram!");
-        setTimeout(() => { location.reload(); }, 10000);
-    }
-
-    function createImpactEffect(pos, color = 0xffffff, size = 1) {
-        if(currentMode !== 'battlegrounds' && currentMode !== 'killer') return;
-        const particles = [];
-        for(let i = 0; i < 10; i++) {
-            const p = new THREE.Mesh(new THREE.SphereGeometry(0.1 * size), new THREE.MeshBasicMaterial({color: color}));
-            p.position.copy(pos); const dir = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
-            scene.add(p); particles.push({mesh: p, dir: dir, life: 1.0});
+    function loop() {
+        requestAnimationFrame(loop);
+        if(!menuOpen && !chatOpen && !isExecuting) {
+            let mx = 0, mz = 0; if(keys['w']) mz -= 1; if(keys['s']) mz += 1; if(keys['a']) mx -= 1; if(keys['d']) mx += 1;
+            if(mx || mz) {
+                const a = Math.atan2(mx, mz) + camAngle;
+                const speed = (currentMode === 'battlegrounds' || (currentMode === 'killer' && isKiller)) ? 0.25 : 0.18;
+                playerGroup.position.x += Math.sin(a)*speed; playerGroup.position.z += Math.cos(a)*speed;
+                playerGroup.rotation.y = a;
+                const animInc = (currentMode === 'battlegrounds' || currentMode === 'killer') ? 0.3 : 0.2;
+                anim += animInc; lL.rotation.x = Math.sin(anim)*0.8; rL.rotation.x = -Math.sin(anim)*0.8;
+                if(!isAttacking) { lA.rotation.x = -Math.sin(anim)*0.7; rA.rotation.x = Math.sin(anim)*0.7; torso.position.y = Math.abs(Math.sin(anim*2))*0.15; if(currentMode === 'battlegrounds' || currentMode === 'killer') torso.rotation.x = 0.2; }
+            } else { 
+                if(lL) lL.rotation.x = rL.rotation.x = 0; 
+                if(!isAttacking && lA) { lA.rotation.x = rA.rotation.x = 0; torso.position.y = 0; torso.rotation.x = 0; if(currentMode === 'battlegrounds' || currentMode === 'killer') { const idle = Date.now() * 0.003; lA.rotation.z = 0.2 + Math.sin(idle)*0.05; rA.rotation.z = -0.2 - Math.sin(idle)*0.05; torso.position.y = Math.sin(idle)*0.05; } }
+            }
+            velY -= 0.012; playerGroup.position.y += velY;
+            let onGround = false; const playerFeetY = playerGroup.position.y - 1.8; const hitRadius = 0.45;
+            for(let platform of obbyPlatforms) {
+                const pPos = platform.position; const pWidth = (platform.geometry.parameters.width / 2) + hitRadius; const pDepth = (platform.geometry.parameters.depth / 2) + hitRadius; const pHeight = platform.geometry.parameters.height / 2;
+                if (playerGroup.position.x > pPos.x - pWidth && playerGroup.position.x < pPos.x + pWidth && playerGroup.position.z > pPos.z - pDepth && playerGroup.position.z < pPos.z + pDepth) { if (playerFeetY <= pPos.y + pHeight && playerFeetY >= pPos.y - (pHeight + 0.5)) { playerGroup.position.y = pPos.y + pHeight + 1.8; velY = 0; onGround = true; break; } }
+            }
+            if(onGround && keys[' ']) velY = 0.3;
+            Object.values(connections).forEach(c => c.send({ type: 'move', pos: playerGroup.position, rot: playerGroup.rotation.y, avatar: userData.avatar, isKiller: isKiller, map: currentMode }));
         }
-        const iv = setInterval(() => {
-            particles.forEach((p, idx) => { p.mesh.position.addScaledVector(p.dir, 0.2); p.life -= 0.05; p.mesh.scale.setScalar(p.life); if(p.life <= 0) { scene.remove(p.mesh); particles.splice(idx, 1); } });
-            if(particles.length === 0) clearInterval(iv);
-        }, 20);
-        shakeAmount = 0.3 * size;
+        const offsetX = camDist * Math.sin(camAngle) * Math.cos(camPitch); const offsetY = camDist * Math.sin(camPitch); const offsetZ = camDist * Math.cos(camAngle) * Math.cos(camPitch);
+        let finalCamX = playerGroup.position.x + offsetX; let finalCamY = playerGroup.position.y + offsetY + 1.5; let finalCamZ = playerGroup.position.z + offsetZ;
+        if(shakeAmount > 0 && (currentMode === 'battlegrounds' || currentMode === 'killer')) { finalCamX += (Math.random()-0.5) * shakeAmount; finalCamY += (Math.random()-0.5) * shakeAmount; finalCamZ += (Math.random()-0.5) * shakeAmount; shakeAmount *= 0.9; }
+        camera.position.set(finalCamX, finalCamY, finalCamZ); camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1, playerGroup.position.z); renderer.render(scene, camera);
+    }
+
+    function updateRemotePlayer(id, data) {
+        // [FIX: ANTI-INVISIBILIDADE] Spawn de Emergência
+        if(!otherPlayers[id]) { 
+            console.log("Spawn de Emergência para: " + id);
+            otherPlayers[id] = createCharacterMesh(data.avatar, true); 
+            scene.add(otherPlayers[id]); 
+        }
+        if(!isExecuting) { otherPlayers[id].position.copy(data.pos); otherPlayers[id].rotation.y = data.rot; }
+        if(data.isKiller) applyKillerVisual(otherPlayers[id]);
+        const p = otherPlayers[id]; const pData = p.userData;
+        if(pData.lL) { const dist = p.position.distanceTo(new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z)); if(dist > 0.01) { const a = Date.now() * 0.015; pData.lL.rotation.x = Math.sin(a)*0.8; pData.rL.rotation.x = -Math.sin(a)*0.8; } else { pData.lL.rotation.x = pData.rL.rotation.x = 0; } }
+    }
+
+    function applyKillerVisual(mesh) {
+        if(mesh.userData.isKillerVisual) return;
+        mesh.userData.isKillerVisual = true;
+        mesh.traverse(child => { if(child.isMesh) child.material = new THREE.MeshStandardMaterial({color: 0x000000}); });
+        const redEyes = new THREE.Group();
+        const eye1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({color: 0xff0000})); eye1.position.set(-0.15, 0.1, 0.31);
+        const eye2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({color: 0xff0000})); eye2.position.set(0.15, 0.1, 0.31);
+        redEyes.add(eye1, eye2); mesh.userData.head.add(redEyes);
+    }
+
+    function handleRemoteAttack(id, data) {
+        const p = otherPlayers[id]; if(!p) return;
+        const pData = p.userData; pData.rA.rotation.x = -Math.PI/1.5;
+        setTimeout(() => { pData.rA.rotation.x = 0; }, 200);
+    }
+
+    function handleDamage(amount) {
+        playerHealth -= amount; if(playerHealth < 0) playerHealth = 0; updateHealthUI();
+        if(currentMode === 'battlegrounds' || currentMode === 'killer') shakeAmount = 0.5;
+        if(playerHealth <= 0) { if (currentMode.startsWith('custom-')) {
+            const game = customGames.find(g => g.id === currentMode);
+            if (game) {
+                loadSandyMap(game.content);
+                playerGroup.position.set(0, 50, 0);
+            }
+        }
+        if(currentMode === 'killer') { } else { alert("Você foi derrotado!"); playerHealth = maxHealth; updateHealthUI(); playerGroup.position.set(0, 5, 0); } }
+    }
+
+    function updateHealthUI() {
+        const fill = document.getElementById('health-fill'); const text = document.getElementById('health-text');
+        if(fill) fill.style.width = (playerHealth / maxHealth * 100) + '%';
+        if(text) text.innerText = playerHealth + '/' + maxHealth;
     }
 
     function performExecution(targetId) {
@@ -563,7 +647,6 @@
                 Object.keys(otherPlayers).forEach(id => {
                     if(otherPlayers[id].position.distanceTo(hitPos) < 2.5) {
                         survivorHits[id] = (survivorHits[id] || 0) + 1;
-                        createImpactEffect(otherPlayers[id].position, 0xff0000, 1);
                         if(survivorHits[id] >= 3) performExecution(id);
                         else connections[id].send({type: 'damage', amount: 20});
                     }
@@ -578,7 +661,7 @@
                     torso.rotation.y = -0.8; rA.rotation.x = -Math.PI/2;
                     const forward = new THREE.Vector3(Math.sin(playerGroup.rotation.y), 0, Math.cos(playerGroup.rotation.y));
                     const hitPos = playerGroup.position.clone().addScaledVector(forward, 2.5);
-                    Object.keys(otherPlayers).forEach(id => { if(otherPlayers[id].position.distanceTo(hitPos) < 3) { connections[id].send({type: 'damage', amount: 15}); createImpactEffect(otherPlayers[id].position, 0xffffff, 1.5); } });
+                    Object.keys(otherPlayers).forEach(id => { if(otherPlayers[id].position.distanceTo(hitPos) < 3) { connections[id].send({type: 'damage', amount: 15}); } });
                     setTimeout(() => { torso.rotation.y = 0; rA.rotation.x = 0; isAttacking = false; }, 200);
                 }, 150);
             } else if(num === 2) {
@@ -587,86 +670,75 @@
                     if(side === 1) { rA.rotation.x = -Math.PI/1.5; lA.rotation.x = 0; torso.rotation.y = 0.3; } else { lA.rotation.x = -Math.PI/1.5; rA.rotation.x = 0; torso.rotation.y = -0.3; }
                     const forward = new THREE.Vector3(Math.sin(playerGroup.rotation.y), 0, Math.cos(playerGroup.rotation.y));
                     const hitPos = playerGroup.position.clone().addScaledVector(forward, 2);
-                    Object.keys(otherPlayers).forEach(id => { if(otherPlayers[id].position.distanceTo(hitPos) < 2.5) { connections[id].send({type: 'damage', amount: 3}); createImpactEffect(hitPos, 0xffffff, 0.5); } });
+                    Object.keys(otherPlayers).forEach(id => { if(otherPlayers[id].position.distanceTo(hitPos) < 2.5) { connections[id].send({type: 'damage', amount: 3}); } });
                     if(count >= 20) { clearInterval(iv); rA.rotation.x = lA.rotation.x = torso.rotation.y = 0; isAttacking = false; }
                 }, 80);
             } else if(num === 3) {
                 isDashing = true; torso.rotation.x = 0.6; const dashDir = new THREE.Vector3(Math.sin(playerGroup.rotation.y), 0, Math.cos(playerGroup.rotation.y));
-                createImpactEffect(playerGroup.position, 0xaaaaaa, 2); const dashStart = Date.now();
+                const dashStart = Date.now();
                 const iv = setInterval(() => {
                     const elapsed = Date.now() - dashStart;
                     if(elapsed < 500) {
                         playerGroup.position.addScaledVector(dashDir, 0.8);
-                        Object.keys(otherPlayers).forEach(id => { if(playerGroup.position.distanceTo(otherPlayers[id].position) < 3) { const knockDir = new THREE.Vector3().subVectors(otherPlayers[id].position, playerGroup.position).normalize(); connections[id].send({type: 'damage', amount: 20}); connections[id].send({type: 'knockback', dir: knockDir, force: 25}); createImpactEffect(otherPlayers[id].position, 0xffaa00, 2); } });
+                        Object.keys(otherPlayers).forEach(id => { if(playerGroup.position.distanceTo(otherPlayers[id].position) < 3) { connections[id].send({type: 'damage', amount: 20}); } });
                     } else { clearInterval(iv); isDashing = false; isAttacking = false; torso.rotation.x = 0; }
                 }, 20);
             } else if(num === 4) {
-                torso.rotation.y = 1.2; rA.rotation.x = -Math.PI/1.1; const aura = new THREE.PointLight(0x00a2ff, 5, 10); aura.position.copy(playerGroup.position).add(new THREE.Vector3(0, 1, 0)); scene.add(aura);
+                torso.rotation.y = 1.2; rA.rotation.x = -Math.PI/1.1;
                 setTimeout(() => {
-                    torso.rotation.y = -1.5; rA.rotation.x = -Math.PI/2; const forward = new THREE.Vector3(Math.sin(playerGroup.rotation.y), 0, Math.cos(playerGroup.rotation.y)); const hitPos = playerGroup.position.clone().addScaledVector(forward, 4); createImpactEffect(hitPos, 0x00a2ff, 5);
-                    Object.keys(otherPlayers).forEach(id => { if(otherPlayers[id].position.distanceTo(hitPos) < 6) { connections[id].send({type: 'damage', amount: 80}); const knockDir = new THREE.Vector3().subVectors(otherPlayers[id].position, playerGroup.position).normalize(); connections[id].send({type: 'knockback', dir: knockDir, force: 50}); } });
-                    scene.remove(aura); setTimeout(() => { torso.rotation.y = 0; rA.rotation.x = 0; isAttacking = false; }, 500);
+                    torso.rotation.y = -1.5; rA.rotation.x = -Math.PI/2; const forward = new THREE.Vector3(Math.sin(playerGroup.rotation.y), 0, Math.cos(playerGroup.rotation.y)); const hitPos = playerGroup.position.clone().addScaledVector(forward, 4);
+                    Object.keys(otherPlayers).forEach(id => { if(otherPlayers[id].position.distanceTo(hitPos) < 6) { connections[id].send({type: 'damage', amount: 80}); } });
+                    setTimeout(() => { torso.rotation.y = 0; rA.rotation.x = 0; isAttacking = false; }, 500);
                 }, 1000);
             }
         }
         const timer = setInterval(() => { cooldowns[num] -= 0.1; if(cdOverlay) cdOverlay.style.height = (cooldowns[num] / (num === 4 ? 15 : 5) * 100) + '%'; if(cooldowns[num] <= 0) { clearInterval(timer); if(slot) slot.classList.remove('cooldown'); if(cdOverlay) cdOverlay.style.height = '0%'; } }, 100);
     }
 
-    function handleDamage(amount) {
-        playerHealth -= amount; if(playerHealth < 0) playerHealth = 0; updateHealthUI();
-        if(currentMode === 'battlegrounds' || currentMode === 'killer') shakeAmount = 0.5;
-        if(playerHealth <= 0) { if(currentMode === 'killer') { } else { alert("Você foi derrotado!"); playerHealth = maxHealth; updateHealthUI(); playerGroup.position.set(0, 5, 0); } }
+    function initKillerLobby() {
+        lobbyPlayers = [peer.id];
+        updateLobbyUI();
+        Object.values(connections).forEach(c => c.send({type: 'killer_lobby', players: lobbyPlayers}));
     }
 
-    function updateHealthUI() {
-        const fill = document.getElementById('health-fill'); const text = document.getElementById('health-text');
-        if(fill) fill.style.width = (playerHealth / maxHealth * 100) + '%';
-        if(text) text.innerText = playerHealth + '/' + maxHealth;
-    }
-
-    function loop() {
-        requestAnimationFrame(loop);
-        if(!menuOpen && !chatOpen && !isExecuting) {
-            let mx = 0, mz = 0; if(keys['w']) mz -= 1; if(keys['s']) mz += 1; if(keys['a']) mx -= 1; if(keys['d']) mx += 1;
-            if(mx || mz) {
-                const a = Math.atan2(mx, mz) + camAngle;
-                const speed = (currentMode === 'battlegrounds' || (currentMode === 'killer' && isKiller)) ? 0.25 : 0.18;
-                playerGroup.position.x += Math.sin(a)*speed; playerGroup.position.z += Math.cos(a)*speed;
-                playerGroup.rotation.y = a;
-                const animInc = (currentMode === 'battlegrounds' || currentMode === 'killer') ? 0.3 : 0.2;
-                anim += animInc; lL.rotation.x = Math.sin(anim)*0.8; rL.rotation.x = -Math.sin(anim)*0.8;
-                if(!isAttacking) { lA.rotation.x = -Math.sin(anim)*0.7; rA.rotation.x = Math.sin(anim)*0.7; torso.position.y = Math.abs(Math.sin(anim*2))*0.15; if(currentMode === 'battlegrounds' || currentMode === 'killer') torso.rotation.x = 0.2; }
-            } else { 
-                if(lL) lL.rotation.x = rL.rotation.x = 0; 
-                if(!isAttacking && lA) { lA.rotation.x = rA.rotation.x = 0; torso.position.y = 0; torso.rotation.x = 0; if(currentMode === 'battlegrounds' || currentMode === 'killer') { const idle = Date.now() * 0.003; lA.rotation.z = 0.2 + Math.sin(idle)*0.05; rA.rotation.z = -0.2 - Math.sin(idle)*0.05; torso.position.y = Math.sin(idle)*0.05; } }
-            }
-            velY -= 0.012; playerGroup.position.y += velY;
-            let onGround = false; const playerFeetY = playerGroup.position.y - 1.8; const hitRadius = 0.45;
-            for(let platform of obbyPlatforms) {
-                const pPos = platform.position; const pWidth = (platform.geometry.parameters.width / 2) + hitRadius; const pDepth = (platform.geometry.parameters.depth / 2) + hitRadius; const pHeight = platform.geometry.parameters.height / 2;
-                if (playerGroup.position.x > pPos.x - pWidth && playerGroup.position.x < pPos.x + pWidth && playerGroup.position.z > pPos.z - pDepth && playerGroup.position.z < pPos.z + pDepth) { if (playerFeetY <= pPos.y + pHeight && playerFeetY >= pPos.y - (pHeight + 0.5)) { playerGroup.position.y = pPos.y + pHeight + 1.8; velY = 0; onGround = true; break; } }
-            }
-            if(onGround && keys[' ']) velY = 0.3;
-            Object.values(connections).forEach(c => c.send({ type: 'move', pos: playerGroup.position, rot: playerGroup.rotation.y, avatar: userData.avatar, isKiller: isKiller }));
+    function handleKillerLobby(id, data) {
+        lobbyPlayers = data.players;
+        updateLobbyUI();
+        if(lobbyPlayers.length >= 2 && !killerGameActive && peer.id === lobbyPlayers[0]) {
+            setTimeout(() => {
+                const kId = lobbyPlayers[Math.floor(Math.random() * lobbyPlayers.length)];
+                Object.values(connections).forEach(c => c.send({type: 'killer_start', killerId: kId}));
+                startKillerGame({killerId: kId});
+            }, 5000);
         }
-        const offsetX = camDist * Math.sin(camAngle) * Math.cos(camPitch); const offsetY = camDist * Math.sin(camPitch); const offsetZ = camDist * Math.cos(camAngle) * Math.cos(camPitch);
-        let finalCamX = playerGroup.position.x + offsetX; let finalCamY = playerGroup.position.y + offsetY + 1.5; let finalCamZ = playerGroup.position.z + offsetZ;
-        if(shakeAmount > 0 && (currentMode === 'battlegrounds' || currentMode === 'killer')) { finalCamX += (Math.random()-0.5) * shakeAmount; finalCamY += (Math.random()-0.5) * shakeAmount; finalCamZ += (Math.random()-0.5) * shakeAmount; shakeAmount *= 0.9; }
-        camera.position.set(finalCamX, finalCamY, finalCamZ); camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1, playerGroup.position.z); renderer.render(scene, camera);
     }
 
-    function updateRemotePlayer(id, data) {
-        if(!otherPlayers[id]) { otherPlayers[id] = createCharacterMesh(data.avatar, true); scene.add(otherPlayers[id]); }
-        if(!isExecuting) { otherPlayers[id].position.copy(data.pos); otherPlayers[id].rotation.y = data.rot; }
-        if(data.isKiller) applyKillerVisual(otherPlayers[id]);
-        const p = otherPlayers[id]; const pData = p.userData;
-        if(pData.lL) { const dist = p.position.distanceTo(new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z)); if(dist > 0.01) { const a = Date.now() * 0.015; pData.lL.rotation.x = Math.sin(a)*0.8; pData.rL.rotation.x = -Math.sin(a)*0.8; } else { pData.lL.rotation.x = pData.rL.rotation.x = 0; } }
+    function updateLobbyUI() {
+        const list = document.getElementById('lobby-players'); if(!list) return;
+        list.innerHTML = lobbyPlayers.map(p => `<div style="padding:5px; border-bottom:1px solid #333;">${p.replace('sandblox-', '')}</div>`).join('');
+        document.getElementById('lobby-status').innerText = lobbyPlayers.length < 2 ? "Aguardando jogadores (Mínimo 2)..." : "Iniciando em breve...";
     }
 
-    function handleRemoteAttack(id, data) {
-        const p = otherPlayers[id]; if(!p) return;
-        const pData = p.userData; pData.rA.rotation.x = -Math.PI/1.5;
-        setTimeout(() => { pData.rA.rotation.x = 0; }, 200);
+    function startKillerGame(data) {
+        killerGameActive = true; killerId = data.killerId; isKiller = (peer.id === killerId);
+        document.getElementById('killer-lobby-ui').style.display = 'none';
+        document.getElementById('killer-timer').style.display = 'block';
+        if(isKiller) { applyKillerVisual(playerGroup); alert("VOCÊ É O ASSASSINO! Elimine todos."); }
+        else { alert("SOBREVIVA! O assassino está entre nós."); }
+        gameTimer = 120;
+        killerInterval = setInterval(() => {
+            gameTimer--;
+            const mins = Math.floor(gameTimer/60); const secs = gameTimer%60;
+            document.getElementById('killer-timer').innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+            if(gameTimer <= 0) { endKillerGame('survivors'); }
+        }, 1000);
+    }
+
+    function endKillerGame(winner) {
+        killerGameActive = false; clearInterval(killerInterval);
+        document.getElementById('killer-timer').style.display = 'none';
+        alert(winner === 'killer' ? "O ASSASSINO VENCEU!" : "OS SOBREVIVENTES VENCERAM!");
+        location.reload();
     }
 
     window.onmousedown = (e) => { if(e.button === 0 && !menuOpen && !chatOpen && currentMode === 'killer' && isKiller && !inCabinLobby) { useAttack(1); } };
@@ -680,6 +752,96 @@
     window.onmousemove = (e) => { if (document.pointerLockElement === renderer?.domElement) { camAngle -= e.movementX * 0.005; camPitch += e.movementY * 0.005; if (camPitch > 1.4) camPitch = 1.4; if (camPitch < -0.2) camPitch = -0.2; } };
     window.onwheel = (e) => { if (!menuOpen && !chatOpen) { camDist += e.deltaY * 0.02; if (camDist < 4) camDist = 4; if (camDist > 40) camDist = 40; } };
 
+    
+    let customGames = [];
+
+    window.openPublishModal = () => {
+        document.getElementById('publish-modal').style.display = 'flex';
+    };
+
+    window.closePublishModal = () => {
+        document.getElementById('publish-modal').style.display = 'none';
+    };
+
+    window.publishGame = () => {
+        const name = document.getElementById('pub-game-name').value.trim();
+        const fileInput = document.getElementById('pub-game-file');
+        
+        if (!name || !fileInput.files[0]) {
+            alert("Por favor, preencha o nome e selecione um arquivo .sandy");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const fileContent = e.target.result;
+            const gameId = 'custom-' + Date.now();
+            const newGame = {
+                id: gameId,
+                name: name,
+                content: fileContent,
+                thumbColor: '#' + Math.floor(Math.random()*16777215).toString(16)
+            };
+            
+            customGames.push(newGame);
+            addGameToGrid(newGame);
+            closePublishModal();
+            
+            // Notificar outros jogadores via PeerJS
+            Object.values(connections).forEach(c => {
+                if (c.open) c.send({ type: 'NEW_CUSTOM_GAME', game: newGame });
+            });
+        };
+        reader.readAsText(fileInput.files[0]);
+    };
+
+    function addGameToGrid(game) {
+        const grid = document.querySelector('.grid-games');
+        if (!grid) return;
+        const card = document.createElement('div');
+        card.className = 'game-card';
+        card.onclick = () => startGame(game.id);
+        card.innerHTML = `
+            <div class="game-thumb" style="background:${game.thumbColor}">${game.name}</div>
+            <div style="padding:15px"><b>Servidor Customizado</b></div>
+        `;
+        grid.appendChild(card);
+    }
+
+    function loadSandyMap(sandyContent) {
+        const lines = sandyContent.split('\n');
+        lines.forEach((line) => {
+            line = line.trim();
+            if (line.startsWith('_sandylocal_baseplate_cor_')) {
+                const color = line.replace('_sandylocal_baseplate_cor_', '').trim();
+                const ground = new THREE.Mesh(new THREE.BoxGeometry(1000, 2, 1000), new THREE.MeshStandardMaterial({color: color}));
+                ground.position.y = -2.5;
+                scene.add(ground);
+                obbyPlatforms.push(ground);
+            } else if (line.startsWith('_gerar_boneco_local_id_')) {
+                const parts = line.split('_');
+                const posIdx = parts.indexOf('pos');
+                const corIdx = parts.indexOf('cor');
+                const escIdx = parts.indexOf('escala');
+                
+                if (posIdx !== -1 && corIdx !== -1) {
+                    const x = parseFloat(parts[posIdx+1]);
+                    const y = parseFloat(parts[posIdx+2]);
+                    const z = parseFloat(parts[posIdx+3]);
+                    const color = parts[corIdx+1];
+                    const scale = escIdx !== -1 ? parseFloat(parts[escIdx+1]) : 1;
+                    
+                    const geo = new THREE.BoxGeometry(2 * scale, 2 * scale, 2 * scale);
+                    const mat = new THREE.MeshStandardMaterial({color: color});
+                    const obj = new THREE.Mesh(geo, mat);
+                    obj.position.set(x, y, z);
+                    scene.add(obj);
+                    obbyPlatforms.push(obj);
+                }
+            }
+        });
+    }
+    
     window.register = register; window.startGame = startGame; window.openAvatarEditor = openAvatarEditor;
     window.changePartColor = changePartColor; window.toggleItem = toggleItem; window.saveAvatar = saveAvatar;
     window.sendFriendRequest = sendFriendRequest; window.useAttack = useAttack;
