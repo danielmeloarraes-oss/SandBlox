@@ -1,0 +1,167 @@
+
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          /* Base reset */
+          * { box-sizing: border-box; }
+          /* User CSS */
+          
+        </style>
+        <script>
+            // Capture console.log to display in parent (Optional future enhancement, currently just preventing errors)
+            window.onerror = function(message, source, lineno, colno, error) {
+                console.error('Preview Error:', message);
+            };
+        </script>
+      </head>
+      <body>
+        <!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SandBlox - O Clássico Voltou!</title>
+    <style>
+        /* --- ESTILOS GERAIS (CSS) --- */
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #2c3e50;
+            background-image: url('data:image/svg+xml,%3Csvg width="42" height="44" viewBox="0 0 42 44" xmlns="http://www.w3.org/2000/svg"%3E%3Cg id="Page-1" fill="none" fill-rule="evenodd"%3E%3Cg id="brick-wall" fill="%2334495e" fill-opacity="0.4"%3E%3Cpath d="M0 0h42v44H0V0zm1 1h40v20H1V1zM0 23h20v20H0V23zm22 0h20v20H22V23z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+            color: #ecf0f1;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- O HUB PRINCIPAL --- */
+        .hub-container {
+            background-color: rgba(44, 62, 80, 0.95);
+            border: 4px solid #3498db;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-width: 600px;
+            width: 90%;
+            position: relative;
+        }
+
+        /* --- LOGOTIPO --- */
+        .logo-area {
+            margin-bottom: 30px;
+        }
+        .logo-s {
+            font-size: 80px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #3498db;
+            width: 120px;
+            height: 120px;
+            line-height: 120px;
+            border-radius: 20px;
+            display: inline-block;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .game-title {
+            font-size: 32px;
+            margin-top: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* --- TEXTO DE DESCRIÇÃO --- */
+        .description {
+            font-size: 16px;
+            margin-bottom: 40px;
+            line-height: 1.6;
+            color: #bdc3c7;
+        }
+
+        /* --- O BOTÃO DE DOWNLOAD ESTILO 3D --- */
+        .download-button {
+            display: inline-block;
+            background-color: #27ae60;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            text-decoration: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            border-bottom: 5px solid #219150;
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
+            transition: all 0.1s ease;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .download-button:hover {
+            background-color: #2ecc71;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(39, 174, 96, 0.5);
+        }
+
+        .download-button:active {
+            transform: translateY(3px);
+            border-bottom-width: 1px;
+            box-shadow: 0 2px 5px rgba(39, 174, 96, 0.5);
+        }
+
+        .download-button img {
+            width: 24px;
+            height: 24px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+
+        /* --- RODAPÉ --- */
+        .footer {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="hub-container">
+        <div class="logo-area">
+            <div class="logo-s">S</div>
+            <div class="game-title">SandBlox Desktop</div>
+            <div><small>Versão 1.0.0</small></div>
+        </div>
+
+        <p class="description">
+            Reviva a era de ouro da construção 3D! O SandBlox clássico está de volta, agora em um aplicativo desktop leve e rápido. Baixe agora e comece a criar o seu mundo!
+        </p>
+
+        <a href="https://github.com/danielmeloarraes-oss/SandBlox/releases/download/v1.0.0/sandblox-desktop-1.0.0.Setup.exe" class="download-button" id="downloadLink">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/8/87/Windows_logo_-_2021.svg" alt="Windows Logo">
+            Baixar para Windows
+        </a>
+
+        <div class="footer">
+            Desenvolvido por: Boss do SandBlox & Gemini Dev 3 Flash<br>
+            © 2026 SandBlox Corp.
+        </div>
+    </div>
+
+</body>
+</html>
+        <script>
+          try {
+            
+          } catch (err) {
+            console.error('Runtime Error:', err);
+            document.body.innerHTML += '<div style="color:red; background:#ffe6e6; padding:10px; margin-top:20px; border-radius:4px; border:1px solid red;"><strong>Runtime Error:</strong> ' + err.message + '</div>';
+          }
+        </script>
+      </body>
+    </html>
+  
