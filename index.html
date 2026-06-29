@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SandBlox Retro - Downloads</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            background-color: #0b0f19;
+            color: #f8fafc;
+            line-height: 1.5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 750px;
+            text-align: center;
+        }
+
+        /* Título Grande em Azul */
+        h1.main-title {
+            font-size: 64px;
+            font-weight: 800;
+            color: #00a2ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 2px;
+        }
+
+        .sub-title {
+            font-size: 20px;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: lowercase;
+            margin-bottom: 40px;
+            display: block;
+        }
+
+        /* Frase da comunidade abaixo do título */
+        .phrase-container {
+            margin-bottom: 40px;
+            padding: 10px;
+        }
+
+        .community-phrase {
+            font-size: 24px;
+            font-weight: 600;
+            color: #e2e8f0;
+            letter-spacing: 0.5px;
+        }
+
+        /* Botões de Download */
+        .btn-download {
+            display: inline-block;
+            background: #0055ff;
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 700;
+            padding: 18px 50px;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0, 85, 255, 0.2);
+            transition: background 0.2s, transform 0.1s;
+            margin-bottom: 20px; /* Reduzido para dar espaço ao outro botão */
+            width: 100%;
+            max-width: 340px;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-download:hover {
+            background: #0066ff;
+            transform: translateY(-1px);
+        }
+
+        .btn-download:active {
+            transform: translateY(1px);
+        }
+
+        /* Estilo customizado para o botão do Android */
+        .btn-android {
+            background: #04b45f;
+            box-shadow: 0 10px 20px rgba(4, 180, 95, 0.2);
+            margin-bottom: 45px; /* Mantém o espaçamento para o rodapé */
+        }
+
+        .btn-android:hover {
+            background: #05cc6c;
+        }
+
+        /* Informações úteis */
+        .info-container {
+            background: #111827;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: left;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            margin-bottom: 40px;
+        }
+
+        .info-line {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+
+        .info-line strong {
+            color: #f8fafc;
+        }
+
+        footer {
+            border-top: 1px solid #1e293b;
+            padding-top: 20px;
+        }
+
+        footer a {
+            color: #00a2ff;
+            text-decoration: none;
+            margin: 0 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        footer p {
+            font-size: 11px;
+            color: #475569;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <header>
+            <h1 class="main-title">Sandblox</h1>
+            <span class="sub-title">Central de Downloads</span>
+        </header>
+
+        <section class="phrase-container">
+            <p class="community-phrase">"se aventure em mapas feitos pela comunidade"</p>
+        </section>
+
+        <main>
+            <a href="https://github.com/danielmeloarraes-oss/SandBlox/releases/download/v2.0.0/sandblox-multiplayer-1.0.0.Setup.exe" download class="btn-download">
+                BAIXAR PARA WINDOWS
+            </a>
+
+            <br>
+
+            <a href="https://danielmeloarraes-oss.github.io/sandblox-mobile/" class="btn-download btn-android">
+                BAIXAR PARA ANDROID
+            </a>
+        </main>
+
+        <section class="info-container">
+            <div class="info-line">• <strong>Windows:</strong> Exclusivo para Computadores. Se aparecer o SmartScreen, clique em "Mais Informações" -> "Executar assim mesmo".</div>
+            <div class="info-line">• <strong>Android:</strong> Abra esta página pelo Google Chrome ou Edge no celular para liberar o instalador direto na sua tela inicial!</div>
+        </section>
+
+        <footer>
+            <a href="#">Download</a>
+            <a href="#">BloxStudio</a>
+            <a href="#">Regras</a>
+            <p>&copy; 2026 SandBlox Retro. Todos os direitos reservados.</p>
+        </footer>
+    </div>
+
+    <script>
+        let eventoInstalacao;
+        const botaoAndroid = document.getElementById('btn-instalar-android');
+
+        // Captura o evento do Android avisando que o jogo PWA pode ser instalado
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            eventoInstalacao = e;
+            // Faz o botão verde do Android aparecer na tela do celular
+            botaoAndroid.style.display = 'inline-block'; 
+        });
+
+        botaoAndroid.addEventListener('click', async () => {
+            if (eventoInstalacao) {
+                eventoInstalacao.prompt(); // Faz saltar a caixinha oficial de instalação na cara do player!
+                
+                const { outcome } = await eventoInstalacao.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('Jogador aceitou instalar o SandBlox!');
+                }
+                eventoInstalacao = null;
+            } else {
+                // Caso o navegador não dispare o evento, manda ele direto pro link do repositório mobile
+                // COLE O LINK DO SEU REPOSITÓRIO GITHUB PAGES MOBILE ABAIXO ENTRE AS ASPAS:
+                window.location.href = "https://danielmeloarraes.github.io./sandblox-mobile/";
+            }
+        });
+    </script>
+
+</body>
+</html>
